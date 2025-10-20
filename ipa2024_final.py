@@ -19,18 +19,21 @@ import netmiko_final
 import ansible_final
 
 #######################################################################################
-# 2. Assign the Webex access token to the variable ACCESS_TOKEN using environment variables.
+# 2. Assign the Webex access token and Room ID to variables using environment variables.
 
 ACCESS_TOKEN = os.environ.get("WEBEX_ACCESS_TOKEN")
+ROOM_ID = os.environ.get("WEBEX_ROOM_ID") # <-- **การเปลี่ยนแปลงที่ 1**
+
+# Check if environment variables are set
+if not ACCESS_TOKEN or not ROOM_ID:
+    raise Exception("\n!!! Environment variables not set. !!!\n"
+                    "Please set WEBEX_ACCESS_TOKEN and WEBEX_ROOM_ID before running the script.\n"
+                    "Example:\n"
+                    "export WEBEX_ACCESS_TOKEN='Your_Token_Here'\n"
+                    "export WEBEX_ROOM_ID='Your_Room_ID_Here'")
 
 #######################################################################################
 # 3. Prepare parameters get the latest message for messages API.
-
-# Defines a variable that will hold the roomId
-roomIdToGetMessages = (
-    # "IPA CRASH-ROOM OF 66070139"
-    "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vNjgyY2JkNTAtNmM2My0xMWYwLThlOWMtZTc0YzljNTJiNTY5"
-)
 
 while True:
     # always add 1 second of delay to the loop to not go over a rate limit of API calls
@@ -39,7 +42,7 @@ while True:
     # the Webex Teams GET parameters
     #  "roomId" is the ID of the selected room
     #  "max": 1  limits to get only the very last message in the room
-    getParameters = {"roomId": roomIdToGetMessages, "max": 1}
+    getParameters = {"roomId": ROOM_ID, "max": 1} # <-- **การเปลี่ยนแปลงที่ 2**
 
     # the Webex Teams HTTP header, including the Authoriztion
     getHTTPHeader = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
@@ -76,11 +79,10 @@ while True:
 
     # check if the text of the message starts with the magic character "/" followed by your studentID and a space and followed by a command name
     #  e.g.  "/66070123 create"
-    if message.startswith(f"/{my_student_id}"):
+    parts = message.split()
+    if message.startswith(f"/{my_student_id}") and len(parts) > 1:
 
-        # extract the command
-        # split the message by spaces and get the second element (index 1)
-        command = message.split()[1]
+        command = parts[1]
         print(command)
 
 # 5. Complete the logic for each command
@@ -101,23 +103,18 @@ while True:
         elif command == "gigabit_status":
             responseMessage = netmiko_final.gigabit_status()
         elif command == "showrun":
-            # Assuming a router name from the lab, e.g., 'CSR1KV-Pod1-1'
-            # You might need to adjust this based on your specific router.
             router_name = 'CSR1KV-Pod1-1'
             responseMessage, filename = ansible_final.showrun(my_student_id, router_name)
         else:
             responseMessage = "Error: No command or unknown command"
 # 6. Complete the code to post the message to the Webex Teams room.
 
-        # ... (code from section 5) ...
-
         if command == "showrun" and responseMessage == 'ok':
-            # This block handles file attachment for a successful showrun
             fileobject = open(filename, 'rb')
             filetype = "text/plain"
             
             payload = {
-                "roomId": roomIdToGetMessages,
+                "roomId": ROOM_ID, # <-- **การเปลี่ยนแปลงที่ 3**
                 "text": "show running config",
                 "files": (filename, fileobject, filetype),
             }
@@ -128,8 +125,7 @@ while True:
                 "Content-Type": postData.content_type,
             }
         else:
-            # This block handles all other commands which send only text
-            payload = {"roomId": roomIdToGetMessages, "text": responseMessage}
+            payload = {"roomId": ROOM_ID, "text": responseMessage} # <-- **การเปลี่ยนแปลงที่ 4**
             postData = json.dumps(payload)
 
             HTTPHeaders = {

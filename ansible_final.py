@@ -1,46 +1,44 @@
-# เราจะเปลี่ยนไฟล์นี้ให้ทำงานด้วย Netmiko แทน Ansible
-from netmiko import ConnectHandler
-from pprint import pprint
+import subprocess
+import os # <--- STEP 1: Import the 'os' library
 
-# นำการตั้งค่าการเชื่อมต่อมาจาก netmiko_final.py
-# อย่าลืมเปลี่ยน IP ให้ถูกต้อง
-device_ip = "10.0.15.61"
-username = "admin"
-password = "cisco"
-
-device_params = {
-    "device_type": "cisco_ios",
-    "ip": device_ip,
-    "username": username,
-    "password": password,
-    "conn_timeout": 20, # เพิ่ม timeout เพื่อความเสถียร
-}
-
-
-# นี่คือฟังก์ชัน showrun เวอร์ชันใหม่ของเรา
+# ฟังก์ชันนี้ต้องรับ student_id และ router_name มาจากไฟล์หลัก
+# เพื่อสร้างชื่อไฟล์และส่งเป็นตัวแปรให้ playbook
 def showrun(student_id, router_name):
-    
-    # สร้างชื่อไฟล์เหมือนเดิม
+    # read https://www.datacamp.com/tutorial/python-subprocess to learn more about subprocess
+
+    # สร้างชื่อไฟล์ที่เราคาดหวังว่าจะได้จาก playbook
     filename = f"show_run_{student_id}_{router_name}.txt"
     
-    try:
-        print("Attempting to connect to device for showrun...")
-        with ConnectHandler(**device_params) as ssh:
-            # 1. รันคำสั่ง show running-config
-            print("Connection successful. Getting running-config...")
-            running_config = ssh.send_command("show running-config")
-            
-            # 2. บันทึกผลลัพธ์ลงไฟล์
-            print(f"Saving config to {filename}...")
-            with open(filename, 'w') as f:
-                f.write(running_config)
-            
-            print("File saved successfully.")
-            # 3. ถ้าทุกอย่างสำเร็จ ให้คืนค่า 'ok' และชื่อไฟล์
-            return "ok", filename
+    # ประกอบร่างคำสั่ง ansible-playbook ให้สมบูรณ์
+    # -i hosts: ระบุ inventory file
+    # --extra-vars: ส่งตัวแปรจาก Python เข้าไปใน playbook
+    command = [
+        'ansible-playbook',
+        'playbook.yaml',
+        '-i', 'hosts',
+        '--extra-vars', f"student_id={student_id} router_name={router_name}"
+    ]
 
-    except Exception as e:
-        print(f"!!! AN ERROR OCCURRED in ansible_final.py (Netmiko version) !!!")
-        print(e)
-        # 4. ถ้ามีปัญหา ให้คืนค่า Error
-        return "Error: Could not get running-config via Netmiko", None
+    # --- THE FINAL FIX IS HERE ---
+    # STEP 2: Explicitly tell Ansible where to find its configuration file.
+    # This forces it to read 'host_key_checking = False'
+    env = os.environ.copy()
+    env['ANSIBLE_CONFIG'] = './ansible.cfg'
+    # ---------------------------
+
+    # รันคำสั่ง, but now with the correct environment
+    result = subprocess.run(command, capture_output=True, text=True, env=env) # <--- STEP 3: Add env=env
+    
+    # เก็บผลลัพธ์ stdout เพื่อนำมาตรวจสอบ
+    ansible_output = result.stdout
+    print("----- Ansible Output -----")
+    print(ansible_output)
+    print("--------------------------")
+
+    # ตรวจสอบผลลัพธ์: 'ok=2' หมายถึง 2 tasks สำเร็จ และ 'failed=0' คือไม่มี task ไหนล้มเหลว
+    if 'ok=2' in ansible_output and 'failed=0' in ansible_output:
+        # ถ้าสำเร็จ คืนค่า 'ok' และชื่อไฟล์ที่สร้างขึ้น
+        return "ok", filename
+    else:
+        # ถ้าล้มเหลว คืนค่า Error และ None สำหรับชื่อไฟล์
+        return "Error: Ansible", None
