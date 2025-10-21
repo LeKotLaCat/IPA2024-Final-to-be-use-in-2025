@@ -3,11 +3,11 @@ import os # <--- STEP 1: Import the 'os' library
 
 # ฟังก์ชันนี้ต้องรับ student_id และ router_name มาจากไฟล์หลัก
 # เพื่อสร้างชื่อไฟล์และส่งเป็นตัวแปรให้ playbook
-def showrun(student_id, router_name):
+def showrun(student_id):
     # read https://www.datacamp.com/tutorial/python-subprocess to learn more about subprocess
 
     # สร้างชื่อไฟล์ที่เราคาดหวังว่าจะได้จาก playbook
-    filename = f"show_run_{student_id}_{router_name}.txt"
+    filename = f"show_run_{student_id}.txt"
     
     # ประกอบร่างคำสั่ง ansible-playbook ให้สมบูรณ์
     # -i hosts: ระบุ inventory file
@@ -16,7 +16,7 @@ def showrun(student_id, router_name):
         'ansible-playbook',
         'playbook.yaml',
         '-i', 'hosts',
-        '--extra-vars', f"student_id={student_id} router_name={router_name}"
+        '--extra-vars', f"student_id={student_id}"
     ]
 
     # --- THE FINAL FIX IS HERE ---

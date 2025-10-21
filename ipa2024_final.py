@@ -103,8 +103,7 @@ while True:
         elif command == "gigabit_status":
             responseMessage = netmiko_final.gigabit_status()
         elif command == "showrun":
-            router_name = 'CSR1KV-Pod1-1'
-            responseMessage, filename = ansible_final.showrun(my_student_id, router_name)
+            responseMessage, filename = ansible_final.showrun(my_student_id)
         else:
             responseMessage = "Error: No command or unknown command"
 # 6. Complete the code to post the message to the Webex Teams room.
